@@ -21,9 +21,17 @@ class Time
 end
 
 class SrtItem
+	attr_accessor :text
+	attr_reader :from
 private
   def str_to_time(str)
   	# input is "00:02:20,746"
+
+  	# This could be done better
+  	# current_time = Time.parse('01:31:51,210')
+  	# # Ten seconds ago
+  	# current_time - 10 # => 2015-01-13 01:31:41 +0100
+
   	parts = str.split(":")
  		result = Time.mktime(
  			0, # void year
@@ -47,6 +55,39 @@ public
 		"#{@from.to_s} #{SEP} #{@to.to_s}\n"+
 		"#{@text}\n"
 	end	
+end
+
+class TyposFinder
+	def initialize
+		@typos = {}
+		@word_db = IO.readlines("/usr/share/dict/words")
+	end
+
+	def analyze_item(item)
+		result = []
+		words = item.text.split(" ")
+		words.each do |word|
+			if @word_db.index(word.delete(",.;:").downcase+"\n") == nil
+				result << word
+			end
+		end
+		result
+	end
+
+	def analyze(items)
+		items.each do |item|
+			founds = analyze_item(item)
+			if founds.length > 0
+				founds.map { |word| @typos[word] = item.from.to_s }
+			end
+		end
+	end
+
+	def save_to_disk
+		if @typos.length > 0
+			IO.write("typos.txt",@typos)
+		end
+	end
 end
 
 class Main
@@ -74,9 +115,13 @@ public
 		@file_name = file_name
 		@shift = shift.to_i
 		@items = []
+		@typos_finder = TyposFinder.new
 	end
+
 	def execute
 		fill_items()
+		@typos_finder.analyze(@items)
+		@typos_finder.save_to_disk
 		@items.each do |item|
 			puts item.to_s
 		end
