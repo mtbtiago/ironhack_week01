@@ -1,8 +1,500 @@
 1
-00:02:17,440 --> 00:02:20,375
-Senator, we're making
-our final approach into Coruscant.
+00:00:00,012 --> 00:00:08,482
+Hello and welcome to Part 1 of the module
+on Patterns and Frameworks for Synchronous
 
 2
-00:02:20,476 --> 00:02:22,501
-Very good, Lieutenant.
+00:00:08,482 --> 00:00:16,088
+Event Handling, Connection Establishment
+and Service Initialization.
+
+3
+00:00:16,088 --> 00:00:21,358
+In this part of the module, we're going to
+be presenting the reactor and acceptor
+
+4
+00:00:21,358 --> 00:00:27,208
+connector patterns, which are key patterns
+for event handling, service initialization
+
+5
+00:00:27,208 --> 00:00:32,013
+and connection establishment.
+To motivate these patterns, let's talk a
+
+6
+00:00:32,013 --> 00:00:36,927
+bit about our expectations of a webserver.
+When we talked about the wrapper facade
+
+7
+00:00:36,927 --> 00:00:41,412
+solution in the previous module we focused
+on keeping things simple, we gave you an
+
+8
+00:00:41,412 --> 00:00:45,832
+iterative solution that doesn't really
+scale, its only handling one connection
+
+9
+00:00:45,832 --> 00:00:50,252
+request, one GET request of the time from
+clients which is absolutely not going to
+
+10
+00:00:50,252 --> 00:00:53,808
+work in practice.
+One alternative approach, people have
+
+11
+00:00:53,808 --> 00:00:58,128
+historically used when they built web
+servers, was to be able to support
+
+12
+00:00:58,128 --> 00:01:02,915
+multiple clients simultaneously.
+And a very classic way of doing this is to
+
+13
+00:01:02,915 --> 00:01:07,779
+use some kind of underlying operating
+system IO multiplexer, like select or
+
+14
+00:01:07,779 --> 00:01:12,305
+poll, or wait for multiple objects.
+And to run this in a single thread of
+
+15
+00:01:12,305 --> 00:01:15,412
+control.
+And then to wait for something to happen
+
+16
+00:01:15,412 --> 00:01:19,356
+on multiple sources of input.
+And then to handle all or part of the
+
+17
+00:01:19,356 --> 00:01:23,745
+incoming request before going on to the
+next request from a different client.
+
+18
+00:01:23,745 --> 00:01:28,437
+Typically when people implement solutions
+in this way, they tend to tightly couple a
+
+19
+00:01:28,437 --> 00:01:31,593
+number of things.
+They tend to couple certain concerns.
+
+20
+00:01:31,593 --> 00:01:35,631
+They couple concerns for event
+multiplexing and demultiplexing, service
+
+21
+00:01:35,631 --> 00:01:39,729
+establishment, connection establishment
+and service initialization.
+
+22
+00:01:39,729 --> 00:01:44,845
+And those things all get glommed together
+with the actual protocol processing done
+
+23
+00:01:44,845 --> 00:01:48,562
+in our case using HTTP.
+Lets take a look at little bit of a code
+
+24
+00:01:48,562 --> 00:01:53,689
+fragment which illustrates these problems.
+Here is piece of code you might find in a
+
+25
+00:01:53,689 --> 00:01:58,434
+traditional, reactive style web server and
+what you see it doing as it uses the
+
+26
+00:01:58,434 --> 00:02:02,348
+select call to wait for.
+Either connection events or data events to
+
+27
+00:02:02,348 --> 00:02:06,300
+occur on multiple sources of handles.
+That obviously hard codes us to using
+
+28
+00:02:06,300 --> 00:02:10,451
+select which may not be the right choice
+in all environments and all platforms.
+
+29
+00:02:10,451 --> 00:02:14,487
+We're also still hard coding ourselves to
+some Posix and Unixisms as far as how
+
+30
+00:02:14,487 --> 00:02:17,952
+socket handles are defined.
+That will be a problem if we try to port
+
+31
+00:02:17,952 --> 00:02:22,506
+to other platforms like Windows.
+We're also using sequential linear search
+
+32
+00:02:22,506 --> 00:02:27,267
+to look through all the handles to find
+handles where activity have gotten sources
+
+33
+00:02:27,267 --> 00:02:31,614
+of events to come in, that will take a
+certain amount of long time if there's a
+
+34
+00:02:31,614 --> 00:02:35,569
+lot of connected clients.
+And then finally, we also tightly couple
+
+35
+00:02:35,569 --> 00:02:39,921
+the protocol processing, the HTTP protocol
+processing with the connection
+
+36
+00:02:39,921 --> 00:02:43,941
+establishment, service initialization, and
+event multiplexing.
+
+37
+00:02:43,941 --> 00:02:48,033
+So how can we get around these problems?
+Well what we're going to talk about here
+
+38
+00:02:48,033 --> 00:02:51,826
+as a way to do it is to apply a pair of
+patterns that are often used together.
+
+39
+00:02:51,826 --> 00:02:56,092
+These patterns are the reactor pattern and
+the acceptor connector pattern and we're
+
+40
+00:02:56,092 --> 00:02:59,971
+going to use these patterns in order to be
+able to separate out the generic.
+
+41
+00:02:59,971 --> 00:03:03,986
+Event infrastructure service
+initialization a connection establishment
+
+42
+00:03:03,986 --> 00:03:08,289
+code from the protocol processing we do in
+the web server once things are connected.
+
+43
+00:03:08,289 --> 00:03:10,598
+Let's talk first about the reactor
+pattern.
+
+44
+00:03:10,598 --> 00:03:15,219
+If you take a look at this diagram, it
+illustrates the structure of the reactor
+
+45
+00:03:15,219 --> 00:03:18,238
+pattern, which is broken up into a couple
+of parts.
+
+46
+00:03:18,238 --> 00:03:21,581
+First we have a role, or a class, called a
+reactor.
+
+47
+00:03:21,581 --> 00:03:26,722
+And it's essentially a container and
+applications, or higher level services
+
+48
+00:03:26,722 --> 00:03:32,380
+register so called event handlers with a
+reactor via its register handler methods.
+
+49
+00:03:32,380 --> 00:03:37,363
+And these handlers are typically pointers
+to base class objects that can be
+
+50
+00:03:37,363 --> 00:03:42,074
+subclassed and customized to provide
+specific event handling logic.
+
+51
+00:03:42,074 --> 00:03:46,964
+The reactor then squirrels away this
+information in some internal tables, and
+
+52
+00:03:46,964 --> 00:03:51,700
+at some point the application turns the
+flow of control over to the reactor by
+
+53
+00:03:51,700 --> 00:03:55,469
+calling it's handle events method or run
+event loop method.
+
+54
+00:03:55,469 --> 00:03:59,227
+At which point the reactor then
+coordinates with the underlying IO
+
+55
+00:03:59,227 --> 00:04:04,051
+multiplexer and synchronous event, the
+multiplexing mechanisms that the operating
+
+56
+00:04:04,051 --> 00:04:08,741
+system provides, which wait for activities
+to occur, which wait for events to occur
+
+57
+00:04:08,741 --> 00:04:13,096
+from different sources of events, on these
+handles associated with the event
+
+58
+00:04:13,096 --> 00:04:16,187
+handlers.
+And when stuff happens, it returns and
+
+59
+00:04:16,187 --> 00:04:20,597
+then the reactor will dispatch the
+particular events to the corresponding
+
+60
+00:04:20,597 --> 00:04:23,338
+event handler by invoking their hook
+methods.
+
+61
+00:04:23,338 --> 00:04:27,172
+Now, the application or the higher level
+service will have customized the core
+
+62
+00:04:27,172 --> 00:04:30,192
+event handler base class.
+Overridden its virtual functions.
+
+63
+00:04:30,192 --> 00:04:33,675
+And then carried out whatever service
+specific or application specific
+
+64
+00:04:33,675 --> 00:04:36,497
+processing functionality is needed to
+handle the events.
+
+65
+00:04:36,497 --> 00:04:40,859
+If you take a look at this paper at this
+URL, you'll find more descriptions about
+
+66
+00:04:40,859 --> 00:04:44,812
+the reactor pattern, and ways to implement
+this pattern and practice.
+
+67
+00:04:44,812 --> 00:04:48,689
+Here's a view that illustrates some of the
+dynamics of the reactor pattern.
+
+68
+00:04:48,689 --> 00:04:51,947
+The dynamics are broken up into a couple
+of different phases.
+
+69
+00:04:51,947 --> 00:04:55,733
+One of the first things we do is we
+typically register a bunch of concrete
+
+70
+00:04:55,733 --> 00:04:59,293
+event handlers with a reactor.
+And the reactor often does a little
+
+71
+00:04:59,293 --> 00:05:03,388
+double-dispatching dance with those event
+handlers to get handles and other
+
+72
+00:05:03,388 --> 00:05:07,735
+information explaining what those Handlers
+are trying to do, what types of events
+
+73
+00:05:07,735 --> 00:05:11,726
+they're concerned with, and those things
+get stashed in an internal table.
+
+74
+00:05:11,726 --> 00:05:15,866
+Then at some point the application turns
+the focus of control over to the reactor.
+
+75
+00:05:15,866 --> 00:05:19,772
+It goes ahead and uses the demultiplexing
+and multiplexing mechanisms of the
+
+76
+00:05:19,772 --> 00:05:23,732
+operating system, to wait for events to
+happen, and when those events occur, it
+
+77
+00:05:23,732 --> 00:05:26,541
+then calls back on the corresponding event
+handle.
+
+78
+00:05:26,541 --> 00:05:30,001
+Note the inversion of control that's
+taking place here.
+
+79
+00:05:30,001 --> 00:05:34,409
+The reactor runs the event loop, it has
+the main focus of control and it does
+
+80
+00:05:34,409 --> 00:05:38,953
+callbacks to hook methods back to the
+concrete event handlers to get the work
+
+81
+00:05:38,953 --> 00:05:41,762
+done.
+Let's now turn our attention to the second
+
+82
+00:05:41,762 --> 00:05:45,958
+pattern in this group of patterns, the
+Acceptor-Connector pattern.
+
+83
+00:05:45,959 --> 00:05:50,606
+The purpose of this pattern is to decouple
+the connection establishment and service
+
+84
+00:05:50,606 --> 00:05:54,121
+initialization lodge, which is fairly
+generic as it turns out.
+
+85
+00:05:54,121 --> 00:05:57,967
+From the more specific customized
+application or higher level service
+
+86
+00:05:57,967 --> 00:06:01,761
+protocol processing that occurs once
+things are actually connected.
+
+87
+00:06:01,761 --> 00:06:05,983
+As with the reactor there's a couple of
+layers involved here from a pattern
+
+88
+00:06:05,983 --> 00:06:09,211
+structure point of view.
+The core part of this is some type of
+
+89
+00:06:09,211 --> 00:06:11,597
+dispatcher.
+We're going to be using our reactor,
+
+90
+00:06:11,597 --> 00:06:15,472
+because they work together nicely.
+Which is waiting for say different kinds
+
+91
+00:06:15,472 --> 00:06:18,112
+of events.
+In our particular case, the acceptors and
+
+92
+00:06:18,112 --> 00:06:21,446
+connectors are concerned with connection
+establishment events.
+
+93
+00:06:21,446 --> 00:06:25,541
+Things that occur when a connection
+arrives or when you initiate a connection.
+
+94
+00:06:25,541 --> 00:06:30,354
+There are several layers on top of the
+dispatcher reactor portion, and let's talk
+
+95
+00:06:30,354 --> 00:06:33,945
+about the most important part.
+This is the part that deals with
+
+96
+00:06:33,945 --> 00:06:37,194
+connection establishment and service
+initialization.
+
+97
+00:06:37,194 --> 00:06:41,484
+In this particular layer, we have three
+primary roles, we have connectors,
+
+98
+00:06:41,484 --> 00:06:45,850
+acceptors and service handlers.
+Service handlers are the pieces of logic
+
+99
+00:06:45,850 --> 00:06:48,792
+that actually carry out the application
+protocol.
+
+100
+00:06:48,792 --> 00:06:53,311
+They have a conversation with their peer.
+In our particular case for HTTP, they
+
