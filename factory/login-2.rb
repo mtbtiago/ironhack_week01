@@ -1,15 +1,13 @@
 class Login
-  def initialize
-    @user = "Moritz"
-    @pass = "1234"
-  end
+  USER = "Moritz"
+  PASSW = "1234"
 
   def execute
     puts "Please enter Username"
     @username = gets.chomp
     puts "Please enter Password"
     @password = gets.chomp
-    @username == @user && @pass == @password
+    @username == USER && @password == PASSW
   end
 end
 
