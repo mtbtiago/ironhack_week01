@@ -1,13 +1,37 @@
-class Login
+class UserFileStrategy
+  def initialize
+    @users = IO.readlines("users.txt")
+  end
+  def is_valid_login(user, password)
+    @users.each do |line|
+      current_user = line.split(" ")
+      if current_user[0] == user && current_user[1] == password
+        return true
+        break
+      end
+    end
+    false
+  end
+end
+
+class HardCodedUsersStrategy
   USER = "Moritz"
   PASSW = "1234"
+  def is_valid_login(user, password)
+    user == USER && password == PASSW
+  end
+end
 
+class Login
+  def initialize(strategy)
+    @strategy = strategy
+  end
   def execute
     puts "Please enter Username"
-    @username = gets.chomp
+    username = gets.chomp
     puts "Please enter Password"
-    @password = gets.chomp
-    @username == USER && @password == PASSW
+    password = gets.chomp
+    @strategy.is_valid_login(username,password)
   end
 end
 
@@ -44,8 +68,16 @@ class Answer
     end
   end
 
-  login = Login.new
+  login = Login.new(UserFileStrategy.new)
   if login.execute
     Answer.new.check
-  else puts "Answer is not recalled"
+  else
+    puts "Answer is not recalled"
+  end
+
+  login = Login.new(HardCodedUsersStrategy.new)
+  if login.execute
+    Answer.new.check
+  else
+    puts "Answer is not recalled"
   end
