@@ -1,0 +1,5 @@
+demultiplexing
+subclassed
+decouples
+pattern
+Patterns

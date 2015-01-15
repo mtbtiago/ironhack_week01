@@ -20,6 +20,18 @@ class Time
   end
 end
 
+class ProfanityFilter
+  def initialize
+    @bad_words = IO.readlines("profanity_words.txt")
+  end
+  def sanity_text(text)
+    @bad_words.each do |word|
+      text = text.gsub(word,"CENSORED")
+    end
+    text
+  end
+end
+
 class SrtItem
   attr_accessor :text
   attr_reader :from
@@ -54,6 +66,10 @@ class SrtItem
     "#{@id}\n"+
       "#{@from.to_s} #{SEP} #{@to.to_s}\n"+
       "#{@text}\n"
+  end
+  def check_for_profanity(filter)
+    # chek time. Just censored 30 first minutes
+    @text = filter.sanity_text(@text)
   end
 end
 
@@ -109,6 +125,7 @@ end
 class Main
   private
   def fill_items
+    is_first = false
     file = IO.read(@file_name)
     # let's imagine input file is well formatted
     records = file.split("\n\n")
@@ -121,9 +138,16 @@ class Main
         from_to[0],
         from_to[1],
       record_lines[2..record_lines.size])
-      item.shift(@shift)
+      if is_first
+        @first_time = item.from
+        is_first = false
+      end
       @items << item
     end
+  end
+
+  def apply_shift
+    records.each { |record| record.shift(@shift) }
   end
 
   public
@@ -132,13 +156,16 @@ class Main
     @shift = shift.to_i
     @items = []
     @typos_finder = TyposFinder.new
+    @profanity_filter = ProfanityFilter.new
   end
 
   def execute
     fill_items()
+    apply_shift()
     @typos_finder.analyze(@items)
     @typos_finder.save_to_disk
     @items.each do |item|
+      item.check_for_profanity(@profanity_filter)
       puts item.to_s
     end
   end

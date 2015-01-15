@@ -1,0 +1,14 @@
+GEM
+  remote: https://rubygems.org/
+  specs:
+    awesome_print (1.6.1)
+    curses (1.0.1)
+    ruby-terminfo (0.1.1)
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  awesome_print
+  curses
+  ruby-terminfo (~> 0.1.1)
