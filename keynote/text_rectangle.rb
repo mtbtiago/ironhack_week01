@@ -1,5 +1,6 @@
 require 'terminfo'
 require 'awesome_print'
+# require 'pry'
 
 class TextRectangle
 private
@@ -67,6 +68,7 @@ public
     i = first_offset
     j = 0
     while i < vert
+      # binding.pry
       if (i >= first_offset && j < lines.length)
         show_text = lines[j]
         j += 1
