@@ -4,19 +4,19 @@ class MovementStrategyFactory
   def self.create_strategy(piece)
     case piece
     when "P"
-      PawnMovementStrategy.new
+      [PawnMovementStrategy.new]
     when "N"
-      NkightMovementStrategy.new
+      [NkightMovementStrategy.new]
     when "B"
-      BishopMovementStrategy.new
+      [DiagonalMovementStrategy.new]
     when "R"
-      RookMovementStrategy.new
+      [VerticalMovementStrategy.new]
     when "Q"
-      QueenMovementStrategy.new
+      [DiagonalMovementStrategy.new,VerticalMovementStrategy.new]
     when "K"
-      KingMovementStrategy.new
+      [KingMovementStrategy.new]
     else
-      NoMovementStrategy.new
+      [NoMovementStrategy.new]
     end
   end
 end
@@ -47,7 +47,7 @@ class NkightMovementStrategy
   end
 end
 
-class BishopMovementStrategy
+class DiagonalMovementStrategy
   def build_valid_targets(from_pos,direction = 0)
     result = ValidPositions.new
     x = from_pos.x
@@ -76,60 +76,9 @@ class BishopMovementStrategy
   end
 end
 
-class RookMovementStrategy
+class VerticalMovementStrategy
   def build_valid_targets(from_pos,direction = 0)
     result = ValidPositions.new
-    x = from_pos.x
-    y = from_pos.y
-    while ('a'..'h').include?(x) && (1..8).include?(y)
-      result << MoveCalculator.up_down_left_rigth(Position.new(x,y),0,-1)
-      x = MoveCalculator.add_chr(x,0)
-      y -= 1
-    end
-    while ('a'..'h').include?(x) && (1..8).include?(y)
-      result << MoveCalculator.up_down_left_rigth(Position.new(x,y),0,+1)
-      x = MoveCalculator.add_chr(x,0)
-      y += 1
-    end
-    while ('a'..'h').include?(x) && (1..8).include?(y)
-      result << MoveCalculator.up_down_left_rigth(Position.new(x,y),+1,0)
-      x = MoveCalculator.add_chr(x,+1)
-      y += 0
-    end
-    while ('a'..'h').include?(x) && (1..8).include?(y)
-      result << MoveCalculator.up_down_left_rigth(Position.new(x,y),-1,0)
-      x = MoveCalculator.add_chr(x,-1)
-      y += 0
-    end
-    result
-  end
-end
-
-class QueenMovementStrategy
-  def build_valid_targets(from_pos,direction = 0)
-    result = ValidPositions.new
-    x = from_pos.x
-    y = from_pos.y
-    while ('a'..'h').include?(x) && (1..8).include?(y)
-      result << MoveCalculator.up_down_left_rigth(Position.new(x,y),-1,-1)
-      x = MoveCalculator.add_chr(x,-1)
-      y -= 1
-    end
-    while ('a'..'h').include?(x) && (1..8).include?(y)
-      result << MoveCalculator.up_down_left_rigth(Position.new(x,y),+1,-1)
-      x = MoveCalculator.add_chr(x,+1)
-      y -= 1
-    end
-    while ('a'..'h').include?(x) && (1..8).include?(y)
-      result << MoveCalculator.up_down_left_rigth(Position.new(x,y),-1,+1)
-      x = MoveCalculator.add_chr(x,-1)
-      y += 1
-    end
-    while ('a'..'h').include?(x) && (1..8).include?(y)
-      result << MoveCalculator.up_down_left_rigth(Position.new(x,y),+1,+1)
-      x = MoveCalculator.add_chr(x,+1)
-      y += 1
-    end
     x = from_pos.x
     y = from_pos.y
     while ('a'..'h').include?(x) && (1..8).include?(y)
@@ -227,14 +176,17 @@ end
 #################
 class Piece
   #################
-  attr_reader :position, :color, :strategy
-  def initialize(color, strategy, position)
+  attr_reader :position, :color, :strategies
+  def initialize(color, strategies, position)
     @color = color
-    @strategy = strategy
+    @strategies = strategies
     @position = position
   end
   def validate(to_pos)
-    valid_targets = @strategy.build_valid_targets(@position,MoveCalculator.direction(@color))
+    valid_targets = []
+    @strategies.each do |strategy|
+      valid_targets += strategy.build_valid_targets(@position,MoveCalculator.direction(@color))
+    end
     valid_targets != nil && valid_targets.find_index {|pos| pos == to_pos} != nil
   end
 end
