@@ -234,17 +234,8 @@ class Piece
     @position = position
   end
   def validate(to_pos)
-
-    # ap @position
-    # ap to_pos
-
     valid_targets = @strategy.build_valid_targets(@position,MoveCalculator.direction(@color))
-# ap self
-# ap valid_targets
-
     valid_targets != nil && valid_targets.find_index {|pos| pos == to_pos} != nil
-    # ToDo: the real stuff goes here
-    # (rand * 100).to_i % 2 == 0
   end
 end
 
@@ -258,7 +249,12 @@ class Move
   end
   def validate
     piece = @board.piece_at(@from_pos)
-    piece.validate(@to_pos)
+    result = piece.validate(@to_pos)
+    if result
+      target_piece = @board.piece_at(@to_pos)
+      result = target_piece.color != piece.color
+    end
+    result
   end
 end
 
