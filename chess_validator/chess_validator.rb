@@ -187,7 +187,7 @@ class Piece
     @strategies.each do |strategy|
       valid_targets += strategy.build_valid_targets(@position,MoveCalculator.direction(@color))
     end
-    valid_targets != nil && valid_targets.find_index {|pos| pos == to_pos} != nil
+    valid_targets && valid_targets.find {|pos| pos == to_pos}
   end
 end
 
@@ -231,7 +231,7 @@ class Board
   def piece_at(position)
     idx = @pieces.find_index {|piece|
     piece.position == position }
-    if idx == nil
+    if !idx
       Piece.new("-",MovementStrategyFactory.create_strategy("void"),Position.new("a",8))
     else
       @pieces[idx]
